@@ -22,6 +22,8 @@ import inspect
 import os
 import pwd
 import tempfile
+from urlparse import urlparse
+import signal
 
 from glanceclient.exc import HTTPForbidden
 
@@ -39,6 +41,7 @@ from . import vmsapi as vms_api
 from .. import image as co_image
 
 from nova.openstack.common.gettextutils import _
+import vms.utilities as utilities
 
 LOG = logging.getLogger('nova.cobalt.vmsconn')
 CONF = cfg.CONF
@@ -765,6 +768,13 @@ class LibvirtConnection(VmsConnection):
         # fact, we don't even know it's old PID and a new domain might have
         # appeared at the same PID in the meantime.
         self.vmsapi.kill_memservers(migration_url)
+
+        url = urlparse(migration_url)
+        pids = utilities.get_pids_by_port(url.port)
+        LOG.info("VMSCTL PIDS=%r" % pids)
+        if pids is not None:
+            for p in pids:
+                os.kill(p, signal.SIGTERM)
 
     def _chmod_blessed_files(self, blessed_files):
         for blessed_file in blessed_files:

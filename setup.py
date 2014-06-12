@@ -50,7 +50,7 @@ def git(*args):
     return out
 
 def get_version():
-    v = os.getenv('VERSION', None)
+    v = "%s.%s" % (os.getenv('VERSION', None), os.getenv('RELEASE', None))
     if v is None:
         try:
             d = UnpackedSDist(__file__)

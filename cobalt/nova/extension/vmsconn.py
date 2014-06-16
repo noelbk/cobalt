@@ -22,7 +22,6 @@ import inspect
 import os
 import pwd
 import tempfile
-from urlparse import urlparse
 import signal
 
 from glanceclient.exc import HTTPForbidden
@@ -769,12 +768,31 @@ class LibvirtConnection(VmsConnection):
         # appeared at the same PID in the meantime.
         self.vmsapi.kill_memservers(migration_url)
 
-        url = urlparse(migration_url)
-        pids = utilities.get_pids_by_port(url.port)
-        LOG.info("VMSCTL PIDS=%r" % pids)
-        if pids is not None:
-            for p in pids:
-                os.kill(p, signal.SIGTERM)
+        def get_ports(migration_url):
+            ports = migration_url.split(':')
+            if len(ports) <= 2:
+                LOG.error("len <= 2")
+                return None
+            ports = ports[2].split('|')
+            if not ports[0]:
+                LOG.error("ports[2] == 0")
+                return None
+            LOG.error( "ports %s" % ports)
+            return ports
+
+        def kill_pids(ports):
+            pids = []
+            if ports is not None:
+                for port in ports:
+                    LOG.error("VMSCTL PORT=%r" % port)
+                    pids = utilities.get_pids_by_port(port)
+            if pids is not None:
+                for pid in pids:
+                    LOG.error("VMSCTL PID=%r" % pid)
+                    os.kill(pid, signal.SIGTERM)
+
+        ports = get_ports(migration_url)
+        kill_pids(ports)
 
     def _chmod_blessed_files(self, blessed_files):
         for blessed_file in blessed_files:

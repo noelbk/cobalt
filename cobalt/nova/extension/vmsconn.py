@@ -777,19 +777,16 @@ class LibvirtConnection(VmsConnection):
             if not ports[0]:
                 LOG.error("ports[2] == 0")
                 return None
-            LOG.error( "ports %s" % ports)
+            ports = map(int, ports)
             return ports
 
         def kill_pids(ports):
-            pids = []
-            if ports is not None:
-                for port in ports:
-                    LOG.error("VMSCTL PORT=%r" % port)
-                    pids = utilities.get_pids_by_port(port)
-            if pids is not None:
-                for pid in pids:
-                    LOG.error("VMSCTL PID=%r" % pid)
-                    os.kill(pid, signal.SIGTERM)
+            pids = set()
+            for port in (ports or []):
+                pids |= set(utilities.get_pids_by_port(port))
+            LOG.debug("kill_pids killing pids %s for ports %s" % (pids, ports))
+            for pid in pids:
+                os.kill(pid, signal.SIGTERM)
 
         ports = get_ports(migration_url)
         kill_pids(ports)

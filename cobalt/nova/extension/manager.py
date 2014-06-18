@@ -165,7 +165,7 @@ def _retry_rpc(fn):
         while True:
             try:
                 return fn(*args, **kwargs)
-            except rpc_common.Timeout:
+            except messaging.MessagingTimeout:
                 elapsed = time.time() - start
                 if elapsed > timeout:
                     raise
@@ -258,6 +258,12 @@ class CobaltManager(manager.Manager):
         retries = 0
         while True:
             try:
+                # (dscannell): Reset the change marker on the instance object
+                #              so that only fields we want changed, by calling
+                #              update, are the ones modified in the save. If the
+                #              reset is not called, the unintended modifications
+                #              can be made to the database.
+                instance.obj_reset_changes()
                 instance.update(kwargs)
                 instance.save(context)
                 return instance
@@ -735,11 +741,6 @@ class CobaltManager(manager.Manager):
             # exception and leave the instance intact.
             raise exception.NovaException(_("Cannot migrate an instance that is on another host."))
 
-        # Get a reference to both the destination and source queues
-        #co_dest_queue = rpc.queue_get_for(context, CONF.cobalt_topic, dest)
-        #compute_dest_queue = rpc.queue_get_for(context, CONF.compute_topic, dest)
-        #compute_source_queue = rpc.queue_get_for(context, CONF.compute_topic, self.host)
-
         # Figure out the migration address.
         migration_address = self._get_migration_address(dest)
 
@@ -852,15 +853,6 @@ class CobaltManager(manager.Manager):
             except:
                 _log_error("post migration cleanup")
 
-        # Discard the migration artifacts.
-        # Note that if this fails, we may leave around bits of data
-        # (descriptor in glance) but at least we had a functional VM.
-        # There is not much point in changing the state past here.
-        # Or catching any thrown exceptions (after all, it is still
-        # an error -- just not one that should kill the VM).
-        image_refs = self._extract_image_refs(instance)
-
-        self.vms_conn.discard(context, instance["name"], image_refs=image_refs)
         try:
             # Discard the migration artifacts.
             # Note that if this fails, we may leave around bits of data
@@ -965,9 +957,8 @@ class CobaltManager(manager.Manager):
                 try:
                     network_info = self.network_api.allocate_for_instance(
                                     context, instance, vpn=is_vpn,
-                                    requested_networks=requested_networks,
-                                    conductor_api=self.conductor_api)
-                except rpc_common.Timeout:
+                                    requested_networks=requested_networks)
+                except messaging.MessagingTimeout:
                     LOG.debug(_("Allocate network for instance=%s timed out"),
                                 instance['name'])
                     network_info = self._retry_get_nw_info(context, instance)

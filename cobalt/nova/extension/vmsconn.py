@@ -843,7 +843,7 @@ class LibvirtConnection(VmsConnection):
         for image_ref in image_refs:
             try:
                 self.image_service.delete(context, image_ref)
-            except (exception.ImageNotFound, HTTPForbidden):
+            except (exception.ImageNotFound, HTTPForbidden, exception.ImageNotAuthorized):
                 # Simply ignore this error because the end result
                 # is that the image is no longer there.
                 LOG.debug("The image %s was not found in the image service when removing it." % (image_ref))
